@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { SpreadsheetRow } from './models';
+import { DateTime } from 'luxon';
 
 const categoryToColorId = {
     "Guitar": "11",
@@ -28,22 +29,25 @@ export const insertEvents = async (creds: any, events: SpreadsheetRow[]): Promis
         event.categories = event.categories.slice(1, -1).trim();
         
         const color = categoryToColorId[event.categories as keyof typeof categoryToColorId] ?? "1";
+        const summary = categoryToSummary[event.categories as keyof typeof categoryToSummary] ?? "Other";
 
-        return calendar.events.insert({
+        const addEvent = {
             calendarId: process.env.CALENDAR_ID,
             requestBody: {
-                summary: categoryToSummary[event.categories as keyof typeof categoryToSummary] ?? event.categories,
+                summary: summary,
                 colorId: color,
                 start: {
-                    dateTime: new Date(event.timeStarted).toISOString(),
+                    dateTime: DateTime.fromFormat(event.timeStarted, 'yyyy-MM-dd HH:mm:ss', { zone: 'Europe/Amsterdam' }).toISO(),
                     timeZone: 'Europe/Amsterdam',
                 },
                 end: {
-                    dateTime: new Date(event.timeEnded).toISOString(),
+                    dateTime: DateTime.fromFormat(event.timeEnded, 'yyyy-MM-dd HH:mm:ss', { zone: 'Europe/Amsterdam' }).toISO(),
                     timeZone: 'Europe/Amsterdam',
                 },
             },
-        });
+        };
+
+        return calendar.events.insert(addEvent);
     });
 
     const inserts = insertPromises.length;
