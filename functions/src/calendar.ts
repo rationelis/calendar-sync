@@ -3,7 +3,7 @@ import { SpreadsheetRow } from './models';
 import { DateTime } from 'luxon';
 
 const categoryToColorId = {
-    "Guitar": "11",
+    "Guitar": "7", 
     "Dev": "5",
     "Read": "4",
     "Russian": "10",

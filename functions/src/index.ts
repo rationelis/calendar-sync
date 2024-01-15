@@ -25,7 +25,7 @@ export const sync = functions.https.onRequest(async (request, response) => {
         return;
     }
 
-    const yesterday = new Date();
+    const yesterday = request.query.date ? new Date(request.query.date as string) : new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
     const yesterdaysActivities = events?.filter((row: SpreadsheetRow) => {
