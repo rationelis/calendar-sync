@@ -3,10 +3,11 @@ import { SpreadsheetRow } from './models';
 import { DateTime } from 'luxon';
 
 const categoryToColorId = {
-    "Guitar": "7", 
+    "Guitar": "3", 
     "Dev": "5",
     "Read": "4",
     "Russian": "10",
+    "Study": "7",
 };
 
 const categoryToSummary = {
@@ -14,6 +15,7 @@ const categoryToSummary = {
     "Dev": "Dev 👨‍💻",
     "Read": "Read 📚",
     "Russian": "Russian 🇷🇺",
+    "Study": "Study 📖",
 };
 
 export const insertEvents = async (creds: any, events: SpreadsheetRow[]): Promise<{ data: any, error: string | null }> => {
