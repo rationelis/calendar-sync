@@ -1,5 +1,5 @@
-import { EventImporter } from "../importer";
-import { Event } from "../models";
+import { EventImporter } from "../types";
+import { Event } from "../types";
 import { convertToCsv, findFile, findFolder, getFile, initDrive } from "../utils/drive";
 
 const EXPORT_FOLDER_NAME = "stt_records";

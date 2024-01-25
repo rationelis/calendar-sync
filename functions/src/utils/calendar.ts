@@ -1,5 +1,5 @@
 import { calendar_v3, google } from "googleapis";
-import { Event } from "../models";
+import { Event } from "../types";
 import { DateTime } from "luxon";
 
 const CALENDAR_NAME = process.env.CALENDAR_NAME;

@@ -1,4 +1,4 @@
-import { EventImporter } from "../importer";
+import { EventImporter } from "../types";
 
 export class StravaImporter implements EventImporter {
     constructor(private yesterday: Date) {}

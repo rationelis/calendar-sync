@@ -4,7 +4,7 @@ import path = require("path");
 import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
 import { initCalendar, mapToEvent } from "./utils/calendar";
 import { StravaImporter } from "./sources/strava";
-import { Event } from "./models";
+import { Event } from "./types";
 import { authMiddleware } from "./middleware";
 
 const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
