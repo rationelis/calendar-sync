@@ -1,65 +1,75 @@
 import * as functions from "firebase-functions";
-import { insertEvents } from "./utils/calendar";
-import { promises as fs } from 'fs';
-import path = require('path');
-import { StravaImporter } from "./sources/strava";
+import { promises as fs } from "fs";
+import path = require("path");
 import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
+import { initCalendar, mapToEvent } from "./utils/calendar";
+import { StravaImporter } from "./sources/strava";
 import { Event } from "./models";
+import { authMiddleware } from "./middleware";
 
-const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
 
-export const sync = functions.https.onRequest(async (request, response) => {
-    if (request.headers.authorization !== process.env.AUTH_HEADER) {
-        response.status(401).send('Unauthorized');
-        return;
-    }
+export const sync = functions.https.onRequest(authMiddleware(handleSync));
 
-    const googleCredsFile = await fs.readFile(CREDENTIALS_PATH);
-    const googleCreds = JSON.parse(googleCredsFile.toString());
+async function handleSync(request: functions.https.Request, response: functions.Response<any>) {
+	const googleCreds = await getGoogleCreds();
 
-    const sources = [
-	    new SimpleTimeTrackerImporter(googleCreds),
-        new StravaImporter(),
-    ];
+	const yesterday = getYesterday(request.query.date as string);
 
-    const events: Event[] = [];
+	const sources = [new SimpleTimeTrackerImporter(googleCreds), new StravaImporter(yesterday)];
 
-    for (const source of sources) {
-        const { data: events, error: sourceError } = await source.getEvents();
+	const events = await Promise.all(
+		sources.map(async (source) => {
+			const { data, error } = await source.getEvents();
 
-        if (sourceError) {
-            console.error(sourceError);
-            functions.logger.error(sourceError);
-            response.status(500).send(sourceError);
-            return;
-        }
+			if (error) {
+				console.error(error);
+				functions.logger.error(error);
+				response.status(500).send(error);
+				return;
+			}
 
-        if (events) {
-            events.forEach((event: Event) => {
-                events.push(event);
-            });
-        }
-    }
+			return data;
+		}),
+	);
 
-    const yesterday = request.query.date ? new Date(request.query.date as string) : new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+	if (!events) {
+		response.status(500).send("No events");
+		return;
+	}
 
-    const yesterdaysActivities = events?.filter((row: Event) => {
-        const date = new Date(row.start);
-        return date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
-    });
+	const eventsToInsert = events.filter((event) => isYesterday(event, yesterday));
 
-    const { data: inserts, error: calendarError } = await insertEvents(googleCreds, yesterdaysActivities.filter((row: Event) => row.name !== ""));
+	if (eventsToInsert.length === 0) {
+		response.send("No events to insert");
+		return;
+	}
 
-    if (calendarError) {
-        console.error(calendarError);
-        functions.logger.error(calendarError);
-        response.status(500).send(calendarError);
-        return;
-    }
+	const calendar = await initCalendar(googleCreds);
 
-    functions.logger.info(`Inserted ${inserts} events`);
-    console.log(`Inserted ${inserts} events`);
+	const calendarEvents = eventsToInsert.map(mapToEvent);
 
-    response.send('OK');
-});
+	await Promise.all(calendarEvents.map((event) => calendar.events.insert(event)));
+
+	response.send("OK");
+}
+
+const getGoogleCreds = async () => {
+	const googleCredsFile = await fs.readFile(CREDENTIALS_PATH);
+	return JSON.parse(googleCredsFile.toString());
+};
+
+const getYesterday = (customDate?: string) => {
+	const yesterday = customDate ? new Date(customDate) : new Date();
+	yesterday.setDate(yesterday.getDate() - 1);
+	return yesterday;
+};
+
+const isYesterday = (event: Event, yesterday: Date) => {
+	const date = new Date(event.start);
+	return (
+		date.getDate() === yesterday.getDate() &&
+		date.getMonth() === yesterday.getMonth() &&
+		date.getFullYear() === yesterday.getFullYear()
+	);
+};
