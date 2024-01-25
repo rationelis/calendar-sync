@@ -1,9 +1,10 @@
 import * as functions from "firebase-functions";
-import { getSpreadsheet } from "./drive";
-import { insertEvents } from "./calendar";
+import { insertEvents } from "./utils/calendar";
 import { promises as fs } from 'fs';
 import path = require('path');
-import { SpreadsheetRow } from "./models";
+import { StravaImporter } from "./sources/strava";
+import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
+import { Event } from "./models";
 
 const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
 
@@ -13,27 +14,42 @@ export const sync = functions.https.onRequest(async (request, response) => {
         return;
     }
 
-    const content = await fs.readFile(CREDENTIALS_PATH);
-    const creds = JSON.parse(content.toString());
-    
-    const { data: events, error } = await getSpreadsheet(creds);
+    const googleCredsFile = await fs.readFile(CREDENTIALS_PATH);
+    const googleCreds = JSON.parse(googleCredsFile.toString());
 
-    if (error) {
-        console.error(error);
-        functions.logger.error(error);
-        response.status(500).send(error);
-        return;
+    const sources = [
+	    new SimpleTimeTrackerImporter(googleCreds),
+        new StravaImporter(),
+    ];
+
+    const events: Event[] = [];
+
+    for (const source of sources) {
+        const { data: events, error: sourceError } = await source.getEvents();
+
+        if (sourceError) {
+            console.error(sourceError);
+            functions.logger.error(sourceError);
+            response.status(500).send(sourceError);
+            return;
+        }
+
+        if (events) {
+            events.forEach((event: Event) => {
+                events.push(event);
+            });
+        }
     }
 
     const yesterday = request.query.date ? new Date(request.query.date as string) : new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const yesterdaysActivities = events?.filter((row: SpreadsheetRow) => {
-        const date = new Date(row.timeStarted);
+    const yesterdaysActivities = events?.filter((row: Event) => {
+        const date = new Date(row.start);
         return date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
     });
 
-    const { data: inserts, error: calendarError } = await insertEvents(creds, yesterdaysActivities.filter((row: SpreadsheetRow) => row.activityName !== ""));
+    const { data: inserts, error: calendarError } = await insertEvents(googleCreds, yesterdaysActivities.filter((row: Event) => row.name !== ""));
 
     if (calendarError) {
         console.error(calendarError);
