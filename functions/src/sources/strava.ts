@@ -1,5 +1,5 @@
 import { Event, EventImporter } from "../types";
-import { initDatabase, readData, writeData } from "../helpers/database";
+import { initDatabase, readData, updateData } from "../helpers/database";
 import axios from "axios";
 
 export class StravaImporter implements EventImporter {
@@ -27,7 +27,9 @@ export class StravaImporter implements EventImporter {
 			return { data: null, error: "No access token" };
 		}
 
-		await writeData(db, "stravaRefreshToken", response.data.refresh_token);
+		await updateData(db, {
+			stravaRefreshToken: response.data.refresh_token,
+		});
 
 		const activities = await axios.get("https://www.strava.com/api/v3/athlete/activities", {
 			params: {
