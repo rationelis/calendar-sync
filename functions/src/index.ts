@@ -1,11 +1,14 @@
+import admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { promises as fs } from "fs";
 import path = require("path");
-import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
-import { initCalendar, mapToEvent } from "./utils/calendar";
-import { StravaImporter } from "./sources/strava";
+import { initCalendar, insertEvent, mapToEvent } from "./helpers/calendar";
 import { Event } from "./types";
 import { authMiddleware } from "./middleware";
+import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
+import { StravaImporter } from "./sources/strava";
+
+admin.initializeApp();
 
 const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
 
@@ -18,7 +21,9 @@ async function handleSync(request: functions.https.Request, response: functions.
 
 	const sources = [new SimpleTimeTrackerImporter(googleCreds), new StravaImporter(yesterday)];
 
-	const events = await Promise.all(
+	const events: Event[] = [];
+
+	await Promise.all(
 		sources.map(async (source) => {
 			const { data, error } = await source.getEvents();
 
@@ -29,7 +34,11 @@ async function handleSync(request: functions.https.Request, response: functions.
 				return;
 			}
 
-			return data;
+			if (data) {
+				for (const event of data) {
+					events.push(event);
+				}
+			}
 		}),
 	);
 
@@ -38,6 +47,7 @@ async function handleSync(request: functions.https.Request, response: functions.
 		return;
 	}
 
+	
 	const eventsToInsert = events.filter((event) => isYesterday(event, yesterday));
 
 	if (eventsToInsert.length === 0) {
@@ -49,7 +59,7 @@ async function handleSync(request: functions.https.Request, response: functions.
 
 	const calendarEvents = eventsToInsert.map(mapToEvent);
 
-	await Promise.all(calendarEvents.map((event) => calendar.events.insert(event)));
+	await Promise.all(calendarEvents.map((event) => insertEvent(calendar, event)));
 
 	response.send("OK");
 }

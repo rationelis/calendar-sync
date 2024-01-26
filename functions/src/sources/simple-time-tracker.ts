@@ -1,6 +1,6 @@
 import { EventImporter } from "../types";
 import { Event } from "../types";
-import { convertToCsv, findFile, findFolder, getFile, initDrive } from "../utils/drive";
+import { convertToCsv, findFile, findFolder, getFile, initDrive } from "../helpers/drive";
 
 const EXPORT_FOLDER_NAME = "stt_records";
 const EXPORT_NAME = "stt_records_automatic.csv";
@@ -59,7 +59,7 @@ export class SimpleTimeTrackerImporter implements EventImporter {
 		});
 		const result = data.map((unmapped) => {
 			return {
-				name: unmapped["activity name"],
+				name: unmapped["activity name"].replace(/"/g, ""),
 				start: unmapped["time started"],
 				end: unmapped["time ended"],
 			};

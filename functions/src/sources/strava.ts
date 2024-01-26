@@ -1,20 +1,61 @@
-import { EventImporter } from "../types";
+import { Event, EventImporter } from "../types";
+import { initDatabase, readData, writeData } from "../helpers/database";
+import axios from "axios";
 
 export class StravaImporter implements EventImporter {
-    constructor(private yesterday: Date) {}
+	constructor(private yesterday: Date) {}
 
 	async getEvents(): Promise<{ data: any; error: string | null }> {
-        // Step 1: Retrieve access token and refresh token from database.
+		const db = initDatabase();
 
-        // Step 2: Use refresh token to retrieve new access token.
+		const refreshToken = await readData(db, "stravaRefreshToken");
 
-        // Step 3: Store new access token in database.
+		if (!refreshToken) {
+			return { data: null, error: "No refresh token" };
+		}
 
-        // Step 4: Use new access token to retrieve data from Strava.
+		const response = await axios.post("https://www.strava.com/oauth/token", {
+			client_id: process.env.STRAVA_CLIENT_ID,
+			client_secret: process.env.STRAVA_CLIENT_SECRET,
+			grant_type: "refresh_token",
+			refresh_token: refreshToken,
+		});
 
-        // Step 5: Return data.
+		const accessToken = response.data.access_token;
 
-		const data = {};
-		return { data, error: null };
+		if (!accessToken) {
+			return { data: null, error: "No access token" };
+		}
+
+		await writeData(db, "stravaRefreshToken", response.data.refresh_token);
+
+		const activities = await axios.get("https://www.strava.com/api/v3/athlete/activities", {
+			params: {
+				after: this.yesterday.getTime() / 1000,
+			},
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+			},
+		});
+
+		if (!activities) {
+			return { data: null, error: "No activities" };
+		}
+
+		const events = activities.data.map((activity: any) => ({
+			name: activity.name.toLowerCase().includes("run") ? "Running" : "Exercise",
+			start: new Date(activity.start_date_local)
+				.toISOString()
+				.replace("T", " ")
+				.replace("Z", "")
+				.replace(".000", ""),
+			end: new Date(new Date(activity.start_date_local).getTime() + activity.elapsed_time * 1000)
+				.toISOString()
+				.replace("T", " ")
+				.replace("Z", "")
+				.replace(".000", ""),
+		}));
+
+		return { data: events as Event[], error: null };
 	}
 }
