@@ -38,7 +38,7 @@ const categoryToSummary = {
 	Exercise: "Exercise 🏋️",
 };
 
-export const initCalendar = async (creds: any): Promise<calendar_v3.Calendar> => {
+export const initCalendar = (creds: any): calendar_v3.Calendar => {
 	return google.calendar({
 		version: "v3",
 		auth: new google.auth.GoogleAuth({
@@ -48,9 +48,15 @@ export const initCalendar = async (creds: any): Promise<calendar_v3.Calendar> =>
 	});
 };
 
-export const insertEvent = async (calendar: calendar_v3.Calendar, event: CalendarEvent) => {
-	return calendar.events.insert(event);
-}
+export const insertEvent = async (calendar: calendar_v3.Calendar, event: CalendarEvent): Promise<{ data: any; error: string | null }> => {
+	try {
+		const response = await calendar.events.insert(event);
+		return { data: response.data, error: null };
+	} catch (err: any) {
+		const errorMessage = `Could not insert event: ${err.message}`;
+		return { data: null, error: errorMessage };
+	}
+};
 
 export const mapToEvent = (event: Event): CalendarEvent => {
 	return {

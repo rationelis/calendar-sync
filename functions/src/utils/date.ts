@@ -6,3 +6,6 @@ export const convertDate = (date: string): DateTime => {
 	});
 };
 
+export const sanitizeDate = (input: string | number): string => {
+	return new Date(input).toISOString().replace("T", " ").replace("Z", "").replace(".000", "");
+};

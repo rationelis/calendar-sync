@@ -9,3 +9,15 @@ export const authMiddleware =
 
 		return handler(request, response);
 	};
+
+export const tryCatchMiddleware =
+	(handler: any) => (request: functions.https.Request, response: functions.Response<any>) => {
+		try {
+			return handler(request, response);
+		} catch (err: any) {
+			console.error(err);
+			functions.logger.error(err);
+			response.status(500).send(err.message);
+			// Add Telegram notification
+		}
+	};

@@ -4,7 +4,7 @@ import { promises as fs } from "fs";
 import path = require("path");
 import { initCalendar, insertEvent, mapToEvent } from "./helpers/calendar";
 import { Event } from "./types";
-import { authMiddleware } from "./middleware";
+import { authMiddleware, tryCatchMiddleware } from "./middleware";
 import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
 import { StravaImporter } from "./sources/strava";
 
@@ -12,7 +12,7 @@ admin.initializeApp();
 
 const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
 
-export const sync = functions.https.onRequest(authMiddleware(handleSync));
+export const sync = functions.https.onRequest(authMiddleware(tryCatchMiddleware(handleSync)));
 
 async function handleSync(request: functions.https.Request, response: functions.Response<any>) {
 	const googleCreds = await getGoogleCreds();
@@ -28,10 +28,7 @@ async function handleSync(request: functions.https.Request, response: functions.
 			const { data, error } = await source.getEvents();
 
 			if (error) {
-				console.error(error);
-				functions.logger.error(error);
-				response.status(500).send(error);
-				return;
+				throw new Error(error);
 			}
 
 			if (data) {
@@ -43,25 +40,29 @@ async function handleSync(request: functions.https.Request, response: functions.
 	);
 
 	if (!events) {
-		response.status(500).send("No events");
-		return;
+		throw new Error("No events");
 	}
 
 	
 	const eventsToInsert = events.filter((event) => isYesterday(event, yesterday));
 
 	if (eventsToInsert.length === 0) {
-		response.send("No events to insert");
-		return;
+		throw new Error("No events to insert");
 	}
-
-	const calendar = await initCalendar(googleCreds);
 
 	const calendarEvents = eventsToInsert.map(mapToEvent);
 
-	await Promise.all(calendarEvents.map((event) => insertEvent(calendar, event)));
+	const calendar = initCalendar(googleCreds);
+
+	await Promise.all(calendarEvents.map(async (event) => {
+		const { error } = await insertEvent(calendar, event);
+		if (error) {
+			throw new Error(error);
+		}
+	}));
 
 	response.send("OK");
+	// Add Telegram notification
 }
 
 const getGoogleCreds = async () => {

@@ -1,6 +1,6 @@
 import { EventImporter } from "../types";
 import { Event } from "../types";
-import { convertToCsv, findFile, findFolder, getFile, initDrive } from "../helpers/drive";
+import { findFile, findFolders, getFile, initDrive } from "../helpers/drive";
 
 const EXPORT_FOLDER_NAME = "stt_records";
 const EXPORT_NAME = "stt_records_automatic.csv";
@@ -9,44 +9,38 @@ export class SimpleTimeTrackerImporter implements EventImporter {
 	constructor(private creds: string) {}
 
 	async getEvents(): Promise<{ data: Event[] | null; error: string | null }> {
-		const drive = await initDrive(this.creds);
+		const drive = initDrive(this.creds);
 
-		const folderId = await findFolder(drive, EXPORT_FOLDER_NAME);
-
-		if (!folderId) {
-			return {
-				data: null,
-				error: "Folder not found",
-			};
+		if (!drive) {
+			return { data: null, error: "Could not initialize drive" };
 		}
 
-		const fileId = await findFile(drive, folderId, EXPORT_NAME);
+		const { id: folderID, error: findFoldersError } = await findFolders(drive, EXPORT_FOLDER_NAME);
 
-		if (!fileId) {
-			return {
-				data: null,
-				error: "File not found",
-			};
+		if (findFoldersError) {
+			return { data: null, error: findFoldersError };
 		}
 
-		const file = await getFile(drive, fileId);
+		const { id: fileId, error: findFileError } = await findFile(drive, folderID, EXPORT_NAME);
 
-		if (!file) {
-			return {
-				data: null,
-				error: "Could not get file",
-			};
+		if (findFileError) {
+			return { data: null, error: findFileError };
 		}
 
-		const csv = await convertToCsv(file);
+		const { data, error: getFileError } = await getFile(drive, fileId);
 
-		return {
-			data: this.convertCsvToEvents(csv),
-			error: null,
-		};
+		if (getFileError) {
+			return { data: null, error: getFileError };
+		}
+
+		if (!data) {
+			return { data: null, error: "No data" };
+		}
+		
+		return { data: this.parseData(data), error: null };
 	}
 
-	convertCsvToEvents = (input: string): Event[] => {
+	parseData = (input: string): Event[] => {
 		const rows = input.split("\n");
 		const headers = rows[0].split(",");
 		const data = rows.slice(1).map((row) => {
