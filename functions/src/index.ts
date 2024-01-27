@@ -7,6 +7,7 @@ import { Event } from "./types";
 import { authMiddleware, tryCatchMiddleware } from "./middleware";
 import { SimpleTimeTrackerImporter } from "./sources/simple-time-tracker";
 import { StravaImporter } from "./sources/strava";
+import { sendMessage } from "./helpers/telegram";
 
 admin.initializeApp();
 
@@ -19,50 +20,60 @@ async function handleSync(request: functions.https.Request, response: functions.
 
 	const yesterday = getYesterday(request.query.date as string);
 
-	const sources = [new SimpleTimeTrackerImporter(googleCreds), new StravaImporter(yesterday)];
+	let sources = [
+		{ name: "STT", instance: new SimpleTimeTrackerImporter(googleCreds) },
+		{ name: "Strava", instance: new StravaImporter(yesterday) },
+	];
+
+	const singleRun = request.query.singleRun as string | undefined;
+
+	if (singleRun) {
+		sources = sources.filter((source) => source.name.toLowerCase() === singleRun.toLowerCase());
+	}
 
 	const events: Event[] = [];
 
+	let telegramMessage = "⏳ Calendar Sync 🔄\n";
+
 	await Promise.all(
 		sources.map(async (source) => {
-			const { data, error } = await source.getEvents();
+			const { data, error } = await source.instance.getEvents();
 
-			if (error) {
-				throw new Error(error);
+			if (error || !data) {
+				telegramMessage += `❌ *${source.name}:* ${error}\n`; 
+				return;
 			}
 
-			if (data) {
-				for (const event of data) {
-					events.push(event);
-				}
-			}
-		}),
+			const yesterdayEvents = data.filter((event: Event) => isYesterday(event, yesterday));
+
+			telegramMessage += `✅ *${source.name}*: ${yesterdayEvents?.length || 0} events\n`;
+
+			events.push(...yesterdayEvents);
+		})
 	);
 
-	if (!events) {
-		throw new Error("No events");
-	}
-
-	
-	const eventsToInsert = events.filter((event) => isYesterday(event, yesterday));
-
-	if (eventsToInsert.length === 0) {
+	if (events.length === 0) {
+		telegramMessage += "🤔 No events to insert";
+		await sendMessage(telegramMessage);
 		throw new Error("No events to insert");
 	}
 
-	const calendarEvents = eventsToInsert.map(mapToEvent);
+	const calendarEvents = events.map(mapToEvent);
 
 	const calendar = initCalendar(googleCreds);
 
-	await Promise.all(calendarEvents.map(async (event) => {
-		const { error } = await insertEvent(calendar, event);
-		if (error) {
-			throw new Error(error);
-		}
-	}));
+	await Promise.all(
+		calendarEvents.map(async (event) => {
+			const { error } = await insertEvent(calendar, event);
+			if (error) {
+				console.error(error);
+			}
+		})
+	);
+
+	await sendMessage(telegramMessage);
 
 	response.send("OK");
-	// Add Telegram notification
 }
 
 const getGoogleCreds = async () => {
