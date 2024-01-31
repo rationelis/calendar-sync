@@ -55,7 +55,8 @@ async function handleSync(request: functions.https.Request, response: functions.
 	if (events.length === 0) {
 		telegramMessage += "🤔 No events to insert";
 		await sendMessage(telegramMessage);
-		return response.send("OK");
+		response.send("OK");
+		return;
 	}
 
 	const calendarEvents = events.map(mapToEvent);
