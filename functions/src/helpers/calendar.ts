@@ -26,6 +26,7 @@ const categoryToColorId = {
 	Study: "7",
 	Running: "11",
 	Exercise: "6",
+	Gym: "6",
 };
 
 const categoryToSummary = {
@@ -36,6 +37,7 @@ const categoryToSummary = {
 	Study: "Study 📖",
 	Running: "Running 🏃",
 	Exercise: "Exercise 🏋️",
+	Gym: "Gym 🏋️",
 };
 
 export const initCalendar = (creds: any): calendar_v3.Calendar => {
