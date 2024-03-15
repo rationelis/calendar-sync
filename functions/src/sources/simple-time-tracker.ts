@@ -1,6 +1,7 @@
 import { EventImporter } from "../types";
 import { Event } from "../types";
 import { findFile, findFolders, getFile, initDrive } from "../helpers/drive";
+import axios from "axios";
 
 const EXPORT_FOLDER_NAME = "stt_records";
 const EXPORT_NAME = "stt_records_automatic.csv";
@@ -8,7 +9,24 @@ const EXPORT_NAME = "stt_records_automatic.csv";
 export class SimpleTimeTrackerImporter implements EventImporter {
 	constructor(private creds: string) {}
 
-	async getEvents(): Promise<{ data: Event[] | null; error: string | null }> {
+    async getEvents(): Promise<{ data: Event[] | null; error: string | null }> {
+        const url = process.env.LOCAL_FILE_SERVER;
+        const token = process.env.LOCAL_FILE_SERVER_TOKEN;
+    
+        const file = await axios.get(url ?? "", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!file) {
+            return { data: null, error: "Could not get file" };
+        }
+
+        return { data: this.parseData(file.data), error: null };
+    }
+
+	async getEventsOld(): Promise<{ data: Event[] | null; error: string | null }> {
 		const drive = initDrive(this.creds);
 
 		if (!drive) {
