@@ -81,10 +81,31 @@ export class StravaImporter implements EventImporter {
 	}
 
 	parseData = (data: any): Event[] => {
-		return data.map((activity: any) => ({
-			name: activity.name.toLowerCase().includes("run") ? "Running" : "Exercise",
-			start: sanitizeDate(activity.start_date_local),
-			end: sanitizeDate(new Date(activity.start_date_local).getTime() + activity.elapsed_time * 1000),
-		}));
+		return data.map((activity: any) => {
+            let type = activity.type.toLowerCase();
+            switch (type) {
+                case "run":
+                    type = "Running";
+                    break;
+                case "ride":
+                    type = "Cycling";
+                    break;
+                case "swim":
+                    type = "Swimming";
+                    break;
+                case "walk":
+                    type = "Walking";
+                    break;
+                default:
+                    type = "Exercise";
+                    break;
+            }
+            
+            return {
+			    name: type,
+			    start: sanitizeDate(activity.start_date_local),
+			    end: sanitizeDate(new Date(activity.start_date_local).getTime() + activity.elapsed_time * 1000),
+		    }
+        });
 	};
 }

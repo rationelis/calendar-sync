@@ -20,22 +20,30 @@ interface CalendarEvent {
 
 const categoryToColorId = {
 	Guitar: "3",
-	Dev: "5",
+    Hardware: "5",
+    Software: "9",
 	Read: "4",
 	Russian: "10",
 	Study: "7",
 	Running: "11",
+    Walking: "2",
+    Cycling: "8",
+    Swimming: "1",
 	Exercise: "6",
 	Gym: "6",
 };
 
 const categoryToSummary = {
 	Guitar: "Guitar 🎸",
-	Dev: "Dev 👨‍💻",
+    Hardware: "Hardware 🔧",
+    Software: "Software 💻",
 	Read: "Read 📚",
 	Russian: "Russian 🇷🇺",
 	Study: "Study 📖",
 	Running: "Running 🏃",
+    Walking: "Walking 🚶",
+    Cycling: "Cycling 🚴",
+    Swimming: "Swimming 🏊",
 	Exercise: "Exercise 🏋️",
 	Gym: "Gym 🏋️",
 };
